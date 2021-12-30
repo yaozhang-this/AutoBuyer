@@ -6,6 +6,7 @@ import signal
 import warnings  # install geckodriver via pip
 from colorama import Fore, init
 from urllib.parse import urlparse
+
 init(autoreset=True)
 import geckodriver_autoinstaller
 from selenium import webdriver
@@ -110,9 +111,13 @@ def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headl
 	def report():
 		end_time = time.time()
 		stat_runtime = end_time - start_time
-		spacer = "-" * 22 + "Runtime Report" + "-" * 22
-		print(f"{spacer}\n{Fore.BLUE}Program Runtime: {'%.2f' % stat_runtime}, {Fore.GREEN}Visits: "
-			  			f"{stat_num_of_visits}, {Fore.RED}Fails: {stat_num_of_fails}")
+		spacer = Fore.LIGHTYELLOW_EX + "=-" * 30 + "="
+		spacer2 = Fore.LIGHTYELLOW_EX + "|" + " " * 59 + "|"
+		header = "|" + " " * 14 + "Runtime Report " + str(datetime.datetime.now().time()) + " " * 15 + '|'
+		content = "|" + " " * 7 + f"{Fore.BLUE}Program Runtime: {'%.2f' % stat_runtime}, {Fore.GREEN}Visits: " \
+				  						f"{stat_num_of_visits}, {Fore.RED}Fails:" \
+								   							f" {stat_num_of_fails} {Fore.LIGHTYELLOW_EX}" + " " * 9 + "|"
+		print(f"{spacer}\n{spacer2}\n{header}\n{content}\n{spacer2}\n{spacer}")
 
 	def teardown():
 		if log: report()
@@ -126,7 +131,6 @@ def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headl
 		"""
 		logging.info(f"Stopping: execution duration of {duration} seconds reached")
 		teardown()
-
 
 	signal.signal(signal.SIGALRM, handler_teardown)
 	signal.alarm(duration)  # A whole day would be 60 * 60 * 24 = 86400 secs
