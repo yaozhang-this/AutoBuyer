@@ -67,18 +67,19 @@ def refresh_ip_table():
 
 
 def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headless=False, add_to_cart=True,
-		  checkout=False, duration=86400, log=False):
+		  checkout=False, duration=86400, retry_timeout=600, log=False):
 	"""
 	crawl does periodic crawling of selected sites from input file, has capabilities to perform actions case-by-case
 
 	:param filepath: absolute path of input file that contains urls
     :param has_limit: flag for limiting access frequency
-    :param visits_limit: quantity of access limit
+    :param visits_limit: quantity of access limit, default is 2000 times
     :param notification: flag for remote notification of in-stock alert
     :param headless: flag for headless execution of webdriver
     :param add_to_cart: flag for default action performed
     :param checkout: flag for default action performed
-	:param duration: default timeout for crawl which ever comes first
+	:param duration: timeout for crawl which ever comes first, default is 1 day
+	:param retry_timeout: timeout for retry after a DNS Not Found error, default is 10 minutes
 	:param log: flag for periodic crawl report
 
 	:return None
@@ -102,7 +103,7 @@ def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headl
 	foundButtons = []
 	foundDrivers = []
 	urls = []
-
+	errors = []
 	stat_num_of_visits = 0
 	start_time = time.time()
 	stat_runtime = 0
@@ -141,13 +142,14 @@ def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headl
 		urls.append(url)
 		foundButtons.append(False)
 		foundDrivers.append(None)
+		errors.append((False, False))
 
-	unit_report = 100  # say 1 report per 100 visiti
+	unit_report = 100  # say 1 report per 100 visits
 	while True:
 		d = None  # reference before exception
-		try:
-			for i, b in enumerate(foundButtons):
-				if b is False:
+		for i, b in enumerate(foundButtons):
+			if not b and not errors[i][0]:
+				try:
 					url = urls[i]
 					domain = urlparse(url).netloc
 					fireFoxOptions = webdriver.FirefoxOptions()
@@ -235,15 +237,26 @@ def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headl
 						logging.info(message)
 						teardown()
 
-		except KeyboardInterrupt:
-			teardown()
+				except KeyboardInterrupt:
+					teardown()
 
-		except Exception as e:
-			logging.error(f"{e} occured at {datetime.datetime.now().time()}")
-			# close and retry
-			stat_num_of_fails += 1
-			d.close()
-			d.quit()
+				except Exception as e:
+					logging.error(f"{e} occured at {datetime.datetime.now().time()}")
+					errors[i] = True
+					# close and retry
+					stat_num_of_fails += 1
+					d.close()
+					d.quit()
+			elif not b and errors[i][0]:
+				# skip the errored url until timeout complete
+				def handler_retry(signum, frame):
+					# turn error flag off when called
+					errors[i] = (False, False)
+				# the second subflag of error flag indicates if timeout is triggered
+				if not errors[i][1]:
+					errors[i] = (True, True)
+					signal.signal(signal.SIGALRM, handler_retry)
+					signal.alarm(retry_timeout)  # A whole day would be 60 * 60 * 24 = 86400 secs
 
 
 def main():
