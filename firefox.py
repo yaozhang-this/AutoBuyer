@@ -104,8 +104,7 @@ def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headl
 		foundButtons.append(False)
 		foundDrivers.append(None)
 	while True:
-		# reference before exception
-		d = None
+		d = None  # reference before exception
 		try:
 			for i, b in enumerate(foundButtons):
 				if b is False:
@@ -146,8 +145,7 @@ def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headl
 							logging.info(message)
 							foundButtons[i] = True
 
-					elif domain == "www.walmart.com":
-						# need to modify webdriver
+					elif domain == "www.walmart.com":  # need to modify webdriver
 						try:
 							addToCartButton = d.find_element_by_xpath(
 								"//*[@id=\"__next\"]/div[1]/div/div/div/div/section/main/div/div[2]/div/div[1]/div/div/div[1]/div/div[2]/div/div/div[3]/button")
@@ -201,9 +199,6 @@ def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headl
 
 		except Exception as e:
 			logging.error(f"{e} occured at {datetime.datetime.now().time()}")
-			# delete bad proxy from list
-			# could optimize
-			# print(f"Removed {proxies.pop(index)} from list")
 			# close and retry
 			d.close()
 			d.quit()
