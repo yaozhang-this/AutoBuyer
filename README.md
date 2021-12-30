@@ -1,5 +1,5 @@
 # An expanded AutoBuyer project
-![](https://github.com/yaozhang-this/AutoBuyer/blob/master/Autobuyer.001.png)
+![](https://github.com/yaozhang-this/AutoBuyer/blob/master/Autobuyer.png)
 ## Desired properties:
 * Able to dynamically rotate proxy for each request.
 * Send remote notifications when items are in stock/added to cart/checked out.
