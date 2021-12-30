@@ -2,9 +2,11 @@ import datetime
 import logging
 import sys
 import time
+import signal
 import warnings  # install geckodriver via pip
+from colorama import Fore, init
 from urllib.parse import urlparse
-
+init(autoreset=True)
 import geckodriver_autoinstaller
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -19,7 +21,6 @@ geckodriver_autoinstaller.install()
 
 
 def refresh_ip_table():
-
 	"""
 	refresh_ip_table crawls free proxies from sslproxies.org
 
@@ -65,7 +66,7 @@ def refresh_ip_table():
 
 
 def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headless=False, add_to_cart=True,
-		  checkout=False):
+		  checkout=False, duration=86400, log=False):
 	"""
 	crawl does periodic crawling of selected sites from input file, has capabilities to perform actions case-by-case
 
@@ -76,9 +77,12 @@ def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headl
     :param headless: flag for headless execution of webdriver
     :param add_to_cart: flag for default action performed
     :param checkout: flag for default action performed
+	:param duration: default timeout for crawl which ever comes first
+	:param log: flag for periodic crawl report
 
 	:return None
 	"""
+
 	# proxies = refreshIPTable()
 	# index = 0
 	# index = random.randint(0, len(proxies) - 1)
@@ -97,12 +101,44 @@ def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headl
 	foundButtons = []
 	foundDrivers = []
 	urls = []
+
+	stat_num_of_visits = 0
+	start_time = time.time()
+	stat_runtime = 0
+	stat_num_of_fails = 0
+
+	def report():
+		end_time = time.time()
+		stat_runtime = end_time - start_time
+		spacer = "-" * 22 + "Runtime Report" + "-" * 22
+		print(f"{spacer}\n{Fore.BLUE}Program Runtime: {'%.2f' % stat_runtime}, {Fore.GREEN}Visits: "
+			  			f"{stat_num_of_visits}, {Fore.RED}Fails: {stat_num_of_fails}")
+
+	def teardown():
+		if log: report()
+		sys.exit()
+
+	def handler_teardown(signum, frame):
+
+		"""
+		handler terminates the program when called
+
+		"""
+		logging.info(f"Stopping: execution duration of {duration} seconds reached")
+		teardown()
+
+
+	signal.signal(signal.SIGALRM, handler_teardown)
+	signal.alarm(duration)  # A whole day would be 60 * 60 * 24 = 86400 secs
+
 	for url in lines:
 		if url == '\n':
 			continue
 		urls.append(url)
 		foundButtons.append(False)
 		foundDrivers.append(None)
+
+	unit_report = 100  # say 1 report per 100 visiti
 	while True:
 		d = None  # reference before exception
 		try:
@@ -184,28 +220,30 @@ def crawl(filepath, has_limit=False, visits_limit=2000, notification=True, headl
 						d.close()
 						d.quit()
 
-					if has_limit:
-						visits_limit -= 1
-						if visits_limit == 0:
-							d.close()
-							d.quit()
-							message = f"Configured visits limit of {visits_limit} reached, terminating crawler"
-							if notification: twi.send_simple_sms(message)
-							logging.info(message)
-							sys.exit()
+					stat_num_of_visits += 1
+					if stat_num_of_visits != 0 and stat_num_of_visits % unit_report == 0: report()
+
+					if has_limit and stat_num_of_visits == visits_limit:
+						d.close()
+						d.quit()
+						message = f"Configured visits limit of {visits_limit} reached, terminating crawler"
+						if notification: twi.send_simple_sms(message)
+						logging.info(message)
+						teardown()
 
 		except KeyboardInterrupt:
-			sys.exit()
+			teardown()
 
 		except Exception as e:
 			logging.error(f"{e} occured at {datetime.datetime.now().time()}")
 			# close and retry
+			stat_num_of_fails += 1
 			d.close()
 			d.quit()
 
 
 def main():
-	crawl('ps5_source.txt', headless=True, add_to_cart=False)
+	crawl('ps5_source.txt', headless=True, add_to_cart=False, log=True)
 
 
 if __name__ == '__main__':
